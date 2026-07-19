@@ -128,18 +128,17 @@ export default function Login() {
   const currentSlide = HERO_SLIDES[0];
 
   return (
-    <div className="min-h-dvh bg-base-950 p-4 relative">
+    <div className="min-h-dvh bg-base-950 p-3 sm:p-4 relative">
       <button
         type="button"
         onClick={toggleTheme}
-        className="absolute top-8 right-8 z-20 rounded-xl border border-base-700 bg-base-900 p-3 text-base-400 hover:bg-base-800 hover:text-base-100 shadow-sm"
+        className="absolute right-4 top-4  z-20 rounded-xl border border-base-700 bg-base-900 p-3 text-base-400 hover:bg-base-800 hover:text-base-100 shadow-sm"
         title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
       >
         {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
       </button>
-
-      <div className="mx-auto grid min-h-[calc(100dvh-2rem)] w-full max-w-7xl grid-cols-[1.15fr_0.85fr] overflow-hidden rounded-[2rem] border border-base-700 bg-base-900 shadow-[0_30px_90px_-45px_rgba(31,26,20,0.5)]">
-        <section className="relative flex overflow-hidden border-r border-base-700 bg-gradient-to-br from-[#0c0f1a] via-[#12192c] to-[#070a12] flex-col">
+<div className="mx-auto grid min-h-[calc(100dvh-2rem)] w-full max-w-7xl overflow-hidden rounded-[2rem] border border-base-700 bg-base-900 shadow-[0_30px_90px_-45px_rgba(31,26,20,0.5)] grid-cols-1 lg:grid-cols-[1.15fr_0.85fr]">
+       <section className="relative hidden overflow-hidden border-r border-base-700 bg-gradient-to-br from-[#0c0f1a] via-[#12192c] to-[#070a12] flex-col lg:flex">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.18),transparent_50%),radial-gradient(circle_at_bottom_right,rgba(13,148,136,0.1),transparent_50%)]" />
 
           <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/10 to-transparent" />
@@ -199,8 +198,7 @@ export default function Login() {
             </div>
           </div>
         </section>
-
-        <section className="flex items-center justify-center px-10 py-10">
+<section className="flex items-center justify-center px-4 py-6 sm:px-10 sm:py-10">
           <div className="w-full max-w-[26rem]">
             <div className="rounded-3xl border border-base-700 bg-base-900/80 p-5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.15)] backdrop-blur sm:p-6">
               {mode === 'forgot-password' || mode === 'reset-password' ? (
