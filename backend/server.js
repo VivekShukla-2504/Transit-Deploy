@@ -20,7 +20,26 @@ const reportRoutes = require('./routes/reports');
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
+const rawOrigin = process.env.CLIENT_ORIGIN;
+const allowedOrigins = rawOrigin
+  ? rawOrigin.split(',').map((o) => o.trim().replace(/\/+$/, ''))
+  : ['*'];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      const cleanOrigin = origin.replace(/\/+$/, '');
+      if (allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.use((req, res, next) => {
