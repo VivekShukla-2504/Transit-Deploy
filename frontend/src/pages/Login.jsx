@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import { Compass, Route, ShieldCheck, Sparkles, Sun, Moon, Eye, EyeOff } from 'lucide-react';
+import { Compass, Route, ShieldCheck, Sparkles, Sun, Moon, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -51,12 +51,15 @@ export default function Login() {
     confirmPassword: '',
     otp: '',
     role: 'FleetManager',
+    adminSecretKey: '',
   });
 
   const roleRef = useRef(form.role);
+  const adminSecretKeyRef = useRef(form.adminSecretKey);
   useEffect(() => {
     roleRef.current = form.role;
-  }, [form.role]);
+    adminSecretKeyRef.current = form.adminSecretKey;
+  }, [form.role, form.adminSecretKey]);
 
   const handleGoogleSuccess = useCallback(async (credentialResponse) => {
     setError('');
@@ -64,7 +67,7 @@ export default function Login() {
       setError('Google authentication failed to return a credential.');
       return;
     }
-    const ok = await googleLogin(credentialResponse.credential, roleRef.current);
+    const ok = await googleLogin(credentialResponse.credential, roleRef.current, adminSecretKeyRef.current);
     if (ok) navigate('/');
   }, [googleLogin, navigate, setError]);
 
@@ -391,6 +394,26 @@ export default function Login() {
                         </option>
                       ))}
                     </Select>
+                  </Field>
+                )}
+
+                {mode === 'register' && form.role !== 'Driver' && (
+                  <Field label="Organization Admin Key" required>
+                    <div className="relative">
+                      <Input
+                        type="password"
+                        value={form.adminSecretKey}
+                        onChange={update('adminSecretKey')}
+                        required
+                        className="pl-9"
+                        placeholder="Enter organization authorization key"
+                      />
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-signal-500" />
+                    </div>
+                    <p className="mt-1 flex items-center gap-1.5 text-[11px] text-amber-500 dark:text-amber-400">
+                      <span>🔒</span>
+                      <span>Required to register as Fleet Manager, Safety Officer, or Analyst.</span>
+                    </p>
                   </Field>
                 )}
 

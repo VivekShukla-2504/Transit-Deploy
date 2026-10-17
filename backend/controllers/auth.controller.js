@@ -23,7 +23,7 @@ function signToken(user) {
 // POST /api/auth/register
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, adminSecretKey } = req.body;
 
     if (!name || !email || !password || !role) {
       return res.status(400).json({
@@ -35,6 +35,17 @@ exports.register = async (req, res) => {
       return res.status(400).json({
         message: `Role must be one of: ${ROLES.join(", ")}`,
       });
+    }
+
+    // Role verification: Privileged roles require a valid Admin Secret Key
+    const privilegedRoles = ["FleetManager", "SafetyOfficer", "FinancialAnalyst"];
+    if (privilegedRoles.includes(role)) {
+      const configuredKey = process.env.ADMIN_SECRET_KEY || "TRANSIT_ADMIN_2026";
+      if (!adminSecretKey || adminSecretKey.trim() !== configuredKey.trim()) {
+        return res.status(403).json({
+          message: `Registration as ${role} requires a valid Admin Authorization Key. Please provide your organization secret key.`,
+        });
+      }
     }
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
@@ -323,7 +334,7 @@ exports.resetPassword = async (req, res) => {
 // POST /api/auth/google - Authenticate using Google OAuth ID token
 exports.googleAuth = async (req, res) => {
   try {
-    const { credential, role } = req.body;
+    const { credential, role, adminSecretKey } = req.body;
 
     if (!credential) {
       return res.status(400).json({
@@ -368,7 +379,23 @@ exports.googleAuth = async (req, res) => {
       await user.save();
     } else {
       // New User: create account via Google
-      const assignedRole = role && ROLES.includes(role) ? role : "Driver";
+      const requestedRole = role && ROLES.includes(role) ? role : "Driver";
+      const privilegedRoles = ["FleetManager", "SafetyOfficer", "FinancialAnalyst"];
+
+      let assignedRole = "Driver";
+      if (privilegedRoles.includes(requestedRole)) {
+        const configuredKey = process.env.ADMIN_SECRET_KEY || "TRANSIT_ADMIN_2026";
+        if (adminSecretKey && adminSecretKey.trim() === configuredKey.trim()) {
+          assignedRole = requestedRole;
+        } else {
+          return res.status(403).json({
+            message: `Registering a new account as ${requestedRole} requires a valid Admin Authorization Key. Please enter the organization secret key.`,
+          });
+        }
+      } else {
+        assignedRole = requestedRole;
+      }
+
       user = await User.create({
         name: name || email.split("@")[0],
         email: email.toLowerCase(),
