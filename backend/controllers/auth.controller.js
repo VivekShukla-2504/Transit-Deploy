@@ -91,13 +91,13 @@ exports.login = async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
-    if (!email || !password || !role) {
+    if (!email || !password) {
       return res.status(400).json({
-        message: "Email, password, and role are required.",
+        message: "Email and password are required.",
       });
     }
 
-    if (!ROLES.includes(role)) {
+    if (role && !ROLES.includes(role)) {
       return res.status(400).json({
         message: `Role must be one of: ${ROLES.join(", ")}`,
       });
@@ -118,12 +118,6 @@ exports.login = async (req, res) => {
     if (!match) {
       return res.status(401).json({
         message: "Invalid email or password.",
-      });
-    }
-
-    if (user.role !== role) {
-      return res.status(401).json({
-        message: "The selected role does not match this account's role.",
       });
     }
 
@@ -381,19 +375,15 @@ exports.googleAuth = async (req, res) => {
       // New User: create account via Google
       const requestedRole = role && ROLES.includes(role) ? role : "Driver";
       const privilegedRoles = ["FleetManager", "SafetyOfficer", "FinancialAnalyst"];
+      const configuredKey = process.env.ADMIN_SECRET_KEY || "TRANSIT_ADMIN_2026";
 
       let assignedRole = "Driver";
-      if (privilegedRoles.includes(requestedRole)) {
-        const configuredKey = process.env.ADMIN_SECRET_KEY || "TRANSIT_ADMIN_2026";
-        if (adminSecretKey && adminSecretKey.trim() === configuredKey.trim()) {
-          assignedRole = requestedRole;
-        } else {
-          return res.status(403).json({
-            message: `Registering a new account as ${requestedRole} requires a valid Admin Authorization Key. Please enter the organization secret key.`,
-          });
-        }
-      } else {
+      // If user supplied valid admin key, grant the requested privileged role
+      if (privilegedRoles.includes(requestedRole) && adminSecretKey && adminSecretKey.trim() === configuredKey.trim()) {
         assignedRole = requestedRole;
+      } else {
+        // Safe default: new users without an admin key are granted Driver permissions
+        assignedRole = "Driver";
       }
 
       user = await User.create({
@@ -430,8 +420,47 @@ exports.getMe = async (req, res) => {
     }
     return res.json({ user: user.toSafeObject() });
   } catch (err) {
+    return res.status(500).json({ message: "Session check failed." });
+  }
+};
+
+// POST /api/auth/claim-role - Upgrade authenticated user's role using Admin Secret Key
+exports.claimRole = async (req, res) => {
+  try {
+    const { role, adminSecretKey } = req.body;
+    const privilegedRoles = ["FleetManager", "SafetyOfficer", "FinancialAnalyst"];
+
+    if (!role || !privilegedRoles.includes(role)) {
+      return res.status(400).json({
+        message: `Role must be one of: ${privilegedRoles.join(", ")}`,
+      });
+    }
+
+    const configuredKey = process.env.ADMIN_SECRET_KEY || "TRANSIT_ADMIN_2026";
+    if (!adminSecretKey || adminSecretKey.trim() !== configuredKey.trim()) {
+      return res.status(403).json({
+        message: "Invalid Admin Authorization Key. Please verify with your organization.",
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    user.role = role;
+    await user.save();
+
+    const token = signToken(user);
+
+    return res.json({
+      message: `Role successfully upgraded to ${role}!`,
+      user: user.toSafeObject(),
+      token,
+    });
+  } catch (err) {
     return res.status(500).json({
-      message: "Could not fetch user profile.",
+      message: "Could not upgrade role.",
       error: err.message,
     });
   }

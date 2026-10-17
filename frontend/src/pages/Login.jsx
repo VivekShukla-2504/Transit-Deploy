@@ -50,7 +50,7 @@ export default function Login() {
     password: '',
     confirmPassword: '',
     otp: '',
-    role: 'FleetManager',
+    role: 'Driver',
     adminSecretKey: '',
   });
 
@@ -385,7 +385,7 @@ export default function Login() {
                   </div>
                 )}
 
-                {mode !== 'reset-password' && (
+                {mode === 'register' && (
                   <Field label="Role" required>
                     <Select value={form.role} onChange={update('role')}>
                       {ROLES.map((role) => (

@@ -26,4 +26,7 @@ router.get("/roles", authController.getRoles);
 // GET /api/auth/me (authenticated session check)
 router.get("/me", auth, authController.getMe);
 
+// POST /api/auth/claim-role (upgrade role with organization admin key)
+router.post("/claim-role", auth, authController.claimRole);
+
 module.exports = router;

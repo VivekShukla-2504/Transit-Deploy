@@ -120,6 +120,24 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const claimRole = useCallback(async (role, adminSecretKey) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.post('/auth/claim-role', { role, adminSecretKey });
+      localStorage.setItem('transitops_token', data.token);
+      localStorage.setItem('transitops_user', JSON.stringify(data.user));
+      setUser(data.user);
+      return { ok: true, message: data.message, user: data.user };
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Could not upgrade role.';
+      setError(msg);
+      return { ok: false, message: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -130,6 +148,7 @@ export function AuthProvider({ children }) {
         logout,
         forgotPassword,
         resetPassword,
+        claimRole,
         loading,
         error,
         setError,
