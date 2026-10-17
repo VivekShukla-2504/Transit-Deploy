@@ -119,9 +119,9 @@ export default function Layout({ children }) {
   );
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-base-950 text-base-100">
+    <div className="flex h-dvh overflow-hidden bg-base-950 text-base-100 print:h-auto print:overflow-visible print:bg-white print:text-black">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-base-700/80 bg-base-900/85 backdrop-blur md:flex">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-base-700/80 bg-base-900/85 backdrop-blur md:flex print:hidden">
         <SidebarContent />
       </aside>
 
@@ -129,23 +129,23 @@ export default function Layout({ children }) {
       {sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px] md:hidden"
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px] md:hidden print:hidden"
           aria-label="Close menu overlay"
         />
       )}
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-base-700/80 bg-base-900/95 backdrop-blur transition-transform duration-300 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-base-700/80 bg-base-900/95 backdrop-blur transition-transform duration-300 md:hidden print:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <SidebarContent />
       </aside>
 
-      <main className="scrollbar-thin min-w-0 flex-1 overflow-y-auto">
+      <main className="scrollbar-thin min-w-0 flex-1 overflow-y-auto print:overflow-visible print:h-auto print:p-0">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-base-700/80 bg-base-950/85 px-4 py-3 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-base-700/80 bg-base-950/85 px-4 py-3 backdrop-blur md:hidden print:hidden">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -171,7 +171,7 @@ export default function Layout({ children }) {
           </button>
         </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7 print:max-w-none print:p-0">
           {children}
         </div>
       </main>

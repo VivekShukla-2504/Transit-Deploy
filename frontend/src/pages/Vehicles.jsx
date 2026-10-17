@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import StatusTag from '../components/StatusTag';
 import Modal from '../components/Modal';
+import ConfirmModal from '../components/ConfirmModal';
 import {
   Field,
   Input,
@@ -26,18 +28,22 @@ const EMPTY_FORM = {
 
 export default function Vehicles() {
   const { user } = useAuth();
+  const toast = useToast();
   const canManage = user?.role === 'FleetManager';
 
   const [vehicles, setVehicles] = useState([]);
   const [meta, setMeta] = useState({ statuses: [], types: [] });
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmVehicle, setConfirmVehicle] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -96,31 +102,51 @@ export default function Vehicles() {
 
       if (editing) {
         await api.put(`/vehicles/${editing._id}`, payload);
+        toast.success(`Vehicle ${payload.registrationNumber} updated successfully.`);
       } else {
         await api.post('/vehicles', payload);
+        toast.success(`Vehicle ${payload.registrationNumber} registered successfully.`);
       }
 
       setModalOpen(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not save vehicle.');
+      const msg = err.response?.data?.message || 'Could not save vehicle.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (vehicle) => {
-    if (!confirm(`Delete vehicle ${vehicle.registrationNumber}? This cannot be undone.`)) {
-      return;
-    }
+  const remove = (vehicle) => {
+    setConfirmVehicle(vehicle);
+  };
 
+  const handleDeleteVehicle = async () => {
+    if (!confirmVehicle) return;
+    setDeleting(true);
     try {
-      await api.delete(`/vehicles/${vehicle._id}`);
+      await api.delete(`/vehicles/${confirmVehicle._id}`);
+      toast.success(`Vehicle ${confirmVehicle.registrationNumber} deleted.`);
+      setConfirmVehicle(null);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Could not delete vehicle.');
+      toast.error(err.response?.data?.message || 'Could not delete vehicle.');
+    } finally {
+      setDeleting(false);
     }
   };
+
+  const filteredVehicles = vehicles.filter((vehicle) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      vehicle.registrationNumber?.toLowerCase().includes(term) ||
+      vehicle.name?.toLowerCase().includes(term) ||
+      vehicle.region?.toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div>
@@ -133,6 +159,14 @@ export default function Vehicles() {
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Input
+            type="text"
+            placeholder="Search plate or model..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-48"
+          />
+
           <Select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -193,14 +227,14 @@ export default function Vehicles() {
                   Loading…
                 </td>
               </tr>
-            ) : vehicles.length === 0 ? (
+            ) : filteredVehicles.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-6 text-center text-base-400">
-                  No vehicles registered yet.
+                  {searchTerm ? 'No vehicles match your search.' : 'No vehicles registered yet.'}
                 </td>
               </tr>
             ) : (
-              vehicles.map((vehicle) => (
+              filteredVehicles.map((vehicle) => (
                 <tr
                   key={vehicle._id}
                   className="border-b border-base-800 last:border-0 hover:bg-base-800/50"
@@ -364,6 +398,16 @@ export default function Vehicles() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(confirmVehicle)}
+        title="Delete Vehicle"
+        message={`Are you sure you want to delete vehicle ${confirmVehicle?.registrationNumber}? This cannot be undone.`}
+        confirmText={deleting ? 'Deleting…' : 'Delete vehicle'}
+        danger
+        onConfirm={handleDeleteVehicle}
+        onCancel={() => !deleting && setConfirmVehicle(null)}
+      />
     </div>
   );
 }

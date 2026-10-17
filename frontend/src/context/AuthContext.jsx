@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 
 const AuthContext = createContext(null);
@@ -10,6 +10,28 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Validate existing session token against server on initial mount
+  useEffect(() => {
+    const token = localStorage.getItem('transitops_token');
+    if (!token) return;
+
+    api
+      .get('/auth/me')
+      .then(({ data }) => {
+        if (data.user) {
+          localStorage.setItem('transitops_user', JSON.stringify(data.user));
+          setUser(data.user);
+        }
+      })
+      .catch((err) => {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('transitops_token');
+          localStorage.removeItem('transitops_user');
+          setUser(null);
+        }
+      });
+  }, []);
 
   const login = useCallback(async (email, password, role) => {
     setLoading(true);
@@ -39,6 +61,23 @@ export function AuthProvider({ children }) {
       return true;
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const googleLogin = useCallback(async (credential, role) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.post('/auth/google', { credential, role });
+      localStorage.setItem('transitops_token', data.token);
+      localStorage.setItem('transitops_user', JSON.stringify(data.user));
+      setUser(data.user);
+      return true;
+    } catch (err) {
+      setError(err.response?.data?.message || 'Google authentication failed. Please try again.');
       return false;
     } finally {
       setLoading(false);
@@ -82,7 +121,20 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, forgotPassword, resetPassword, loading, error, setError }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        googleLogin,
+        logout,
+        forgotPassword,
+        resetPassword,
+        loading,
+        error,
+        setError,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

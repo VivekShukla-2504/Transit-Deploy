@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, CheckCircle2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import StatusTag from '../components/StatusTag';
 import Modal from '../components/Modal';
 import {
@@ -23,6 +24,7 @@ const EMPTY_FORM = {
 
 export default function Maintenance() {
   const { user } = useAuth();
+  const toast = useToast();
   const canManage = user?.role === 'FleetManager';
 
   const [logs, setLogs] = useState([]);
@@ -76,10 +78,13 @@ export default function Maintenance() {
         cost: form.cost ? Number(form.cost) : 0,
       });
 
+      toast.success('Maintenance record created.');
       setCreateOpen(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not create maintenance record.');
+      const msg = err.response?.data?.message || 'Could not create maintenance record.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -102,10 +107,13 @@ export default function Maintenance() {
         retireVehicle,
       });
 
+      toast.success('Maintenance record closed.');
       setClosing(null);
       load();
     } catch (err) {
-      setCloseError(err.response?.data?.message || 'Could not close maintenance record.');
+      const msg = err.response?.data?.message || 'Could not close maintenance record.';
+      setCloseError(msg);
+      toast.error(msg);
     }
   };
 

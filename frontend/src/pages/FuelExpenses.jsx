@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Plus, Fuel as FuelIcon, Receipt } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
+import ConfirmModal from '../components/ConfirmModal';
 import {
   Field,
   Input,
@@ -36,6 +38,7 @@ export default function FuelExpenses() {
   );
   const canDelete = ['FleetManager', 'FinancialAnalyst'].includes(user?.role);
 
+  const toast = useToast();
   const [tab, setTab] = useState('fuel');
   const [fuelLogs, setFuelLogs] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -50,6 +53,10 @@ export default function FuelExpenses() {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState(EMPTY_EXPENSE_FORM);
   const [expenseError, setExpenseError] = useState('');
+
+  const [confirmFuel, setConfirmFuel] = useState(null);
+  const [confirmExpense, setConfirmExpense] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadFuel = () => {
     setLoading(true);
@@ -100,18 +107,33 @@ export default function FuelExpenses() {
         date: fuelForm.date || undefined,
       });
 
+      toast.success('Fuel entry recorded successfully.');
       setFuelModalOpen(false);
       loadFuel();
     } catch (err) {
-      setFuelError(err.response?.data?.message || 'Could not record fuel log.');
+      const msg = err.response?.data?.message || 'Could not record fuel log.';
+      setFuelError(msg);
+      toast.error(msg);
     }
   };
 
-  const deleteFuel = async (log) => {
-    if (!confirm('Delete this fuel log?')) return;
+  const deleteFuel = (log) => {
+    setConfirmFuel(log);
+  };
 
-    await api.delete(`/fuel/${log._id}`);
-    loadFuel();
+  const handleConfirmDeleteFuel = async () => {
+    if (!confirmFuel) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/fuel/${confirmFuel._id}`);
+      toast.success('Fuel log deleted.');
+      setConfirmFuel(null);
+      loadFuel();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not delete fuel log.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const openExpenseModal = () => {
@@ -131,18 +153,33 @@ export default function FuelExpenses() {
         date: expenseForm.date || undefined,
       });
 
+      toast.success('Expense recorded successfully.');
       setExpenseModalOpen(false);
       loadExpenses();
     } catch (err) {
-      setExpenseError(err.response?.data?.message || 'Could not record expense.');
+      const msg = err.response?.data?.message || 'Could not record expense.';
+      setExpenseError(msg);
+      toast.error(msg);
     }
   };
 
-  const deleteExpense = async (expense) => {
-    if (!confirm('Delete this expense?')) return;
+  const deleteExpense = (expense) => {
+    setConfirmExpense(expense);
+  };
 
-    await api.delete(`/expenses/${expense._id}`);
-    loadExpenses();
+  const handleConfirmDeleteExpense = async () => {
+    if (!confirmExpense) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/expenses/${confirmExpense._id}`);
+      toast.success('Expense entry deleted.');
+      setConfirmExpense(null);
+      loadExpenses();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not delete expense.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -473,6 +510,26 @@ export default function FuelExpenses() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(confirmFuel)}
+        title="Delete Fuel Log"
+        message={`Are you sure you want to delete this fuel record (${confirmFuel?.liters}L - ₹${confirmFuel?.cost})? This cannot be undone.`}
+        confirmText={deleting ? 'Deleting…' : 'Delete log'}
+        danger
+        onConfirm={handleConfirmDeleteFuel}
+        onCancel={() => !deleting && setConfirmFuel(null)}
+      />
+
+      <ConfirmModal
+        open={Boolean(confirmExpense)}
+        title="Delete Expense"
+        message={`Are you sure you want to delete this ${confirmExpense?.category} expense of ₹${confirmExpense?.amount}? This cannot be undone.`}
+        confirmText={deleting ? 'Deleting…' : 'Delete expense'}
+        danger
+        onConfirm={handleConfirmDeleteExpense}
+        onCancel={() => !deleting && setConfirmExpense(null)}
+      />
     </div>
   );
 }

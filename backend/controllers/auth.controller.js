@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const { OAuth2Client } = require("google-auth-library");
 const { User, ROLES } = require("../models/User");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function signToken(user) {
   return jwt.sign(
@@ -160,6 +163,7 @@ exports.forgotPassword = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     user.resetOtp = otp;
     user.resetOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes valid
+    user.resetOtpAttempts = 0;
     await user.save();
 
     // Configure SMTP transport or fallback to Ethereal
@@ -268,10 +272,33 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    // Verify OTP and Expiration
-    if (!user.resetOtp || user.resetOtp !== otp || !user.resetOtpExpires || user.resetOtpExpires < Date.now()) {
+    // Verify OTP exists and has not expired
+    if (!user.resetOtp || !user.resetOtpExpires || user.resetOtpExpires < Date.now()) {
       return res.status(400).json({
-        message: "Invalid or expired OTP code.",
+        message: "Invalid or expired OTP code. Please request a new one.",
+      });
+    }
+
+    // Check maximum failed attempts to prevent brute force
+    if (user.resetOtpAttempts >= 5) {
+      user.resetOtp = undefined;
+      user.resetOtpExpires = undefined;
+      user.resetOtpAttempts = 0;
+      await user.save();
+      return res.status(429).json({
+        message: "Too many failed OTP attempts. For security, your OTP has been invalidated. Please request a new one.",
+      });
+    }
+
+    // Verify OTP match
+    if (user.resetOtp !== otp) {
+      user.resetOtpAttempts = (user.resetOtpAttempts || 0) + 1;
+      await user.save();
+      const remaining = 5 - user.resetOtpAttempts;
+      return res.status(400).json({
+        message: remaining > 0
+          ? `Invalid OTP code. ${remaining} attempt(s) remaining.`
+          : "Invalid OTP code. Maximum attempts exceeded. Please request a new OTP.",
       });
     }
 
@@ -279,6 +306,7 @@ exports.resetPassword = async (req, res) => {
     user.password = password;
     user.resetOtp = undefined;
     user.resetOtpExpires = undefined;
+    user.resetOtpAttempts = 0;
     await user.save();
 
     return res.json({
@@ -287,6 +315,96 @@ exports.resetPassword = async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       message: "Could not reset password.",
+      error: err.message,
+    });
+  }
+};
+
+// POST /api/auth/google - Authenticate using Google OAuth ID token
+exports.googleAuth = async (req, res) => {
+  try {
+    const { credential, role } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        message: "Google credential token is required.",
+      });
+    }
+
+    let payload;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+
+    if (clientId) {
+      // Verify token cryptographically against Google's public certificates
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } else {
+      // Fallback decode if GOOGLE_CLIENT_ID not yet specified in .env during dev
+      const decoded = jwt.decode(credential);
+      if (!decoded || !decoded.email) {
+        return res.status(400).json({
+          message: "Invalid Google credential token.",
+        });
+      }
+      payload = decoded;
+    }
+
+    const { email, name, picture, sub: googleId } = payload;
+    if (!email) {
+      return res.status(400).json({
+        message: "Google account does not provide an email address.",
+      });
+    }
+
+    let user = await User.findOne({ email: email.toLowerCase() });
+
+    if (user) {
+      // User exists: link Google ID and avatar if needed
+      if (!user.googleId) user.googleId = googleId;
+      if (picture && !user.avatar) user.avatar = picture;
+      await user.save();
+    } else {
+      // New User: create account via Google
+      const assignedRole = role && ROLES.includes(role) ? role : "Driver";
+      user = await User.create({
+        name: name || email.split("@")[0],
+        email: email.toLowerCase(),
+        role: assignedRole,
+        googleId,
+        avatar: picture,
+        authProvider: "google",
+      });
+    }
+
+    const token = signToken(user);
+
+    return res.json({
+      token,
+      user: user.toSafeObject(),
+    });
+  } catch (err) {
+    console.error("Google Auth error:", err);
+    return res.status(401).json({
+      message: "Google authentication failed. Please try again or use email login.",
+      error: err.message,
+    });
+  }
+};
+
+// GET /api/auth/me - Validate current session token and fetch profile
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User account not found." });
+    }
+    return res.json({ user: user.toSafeObject() });
+  } catch (err) {
+    return res.status(500).json({
+      message: "Could not fetch user profile.",
       error: err.message,
     });
   }

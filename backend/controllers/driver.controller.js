@@ -1,4 +1,5 @@
 const { Driver, DRIVER_STATUSES } = require("../models/Driver");
+const { Trip } = require("../models/Trip");
 
 // GET /api/drivers
 exports.getDrivers = async (req, res) => {
@@ -212,6 +213,13 @@ exports.deleteDriver = async (req, res) => {
       return res.status(400).json({
         message:
           "Cannot delete a driver that is currently on a trip.",
+      });
+    }
+
+    const hasActiveTrip = await Trip.exists({ driver: driver._id, status: { $in: ['Draft', 'Dispatched'] } });
+    if (hasActiveTrip) {
+      return res.status(400).json({
+        message: "Cannot delete a driver with active or draft trips. Reassign or cancel the trips first.",
       });
     }
 

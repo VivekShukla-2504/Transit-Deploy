@@ -130,6 +130,11 @@ canvas {
   font-family: var(--font-mono);
 }
 
+/* Sleek Dark Mode for Free OpenStreetMap Tiles (Zero API Key, Zero Watermarks) */
+.dark-map-tiles .leaflet-tile {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(92%);
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -147,5 +152,15 @@ canvas {
   .scrollbar-thin::-webkit-scrollbar {
     width: 5px;
     height: 5px;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+  @page {
+    margin: 1.2cm;
   }
 }

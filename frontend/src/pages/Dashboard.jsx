@@ -4,6 +4,7 @@ import KpiCard from '../components/KpiCard';
 import { Select } from '../components/FormField';
 import { useAuth } from '../context/AuthContext';
 import StatusBar from "../components/StatusBar";
+import FleetMap from '../components/FleetMap';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -14,6 +15,20 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [recentTrips, setRecentTrips] = useState([]);
   const [vehicleStatus, setVehicleStatus] = useState(null);
+  const [mapVehicles, setMapVehicles] = useState([]);
+  const [mapTrips, setMapTrips] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/vehicles'),
+      api.get('/trips'),
+    ])
+      .then(([vRes, tRes]) => {
+        setMapVehicles(vRes.data);
+        setMapTrips(tRes.data);
+      })
+      .catch((err) => console.error('Map data error:', err));
+  }, []);
 
   useEffect(() => {
     api
@@ -140,6 +155,11 @@ const getStatusColor = (status) => {
           <KpiCard label="Total Drivers" value={kpis.totalDrivers} />
         </div>
       )}
+
+      {/* Live Operations & Fleet Radar Map */}
+      <div className="mt-6">
+        <FleetMap vehicles={mapVehicles} trips={mapTrips} height="430px" />
+      </div>
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
 

@@ -22,4 +22,14 @@ router.get(
   reportsController.exportVehicleReport
 );
 
+router.get(
+  "/trips/export.csv",
+  reportsController.exportTripsReport
+);
+
+router.get(
+  "/drivers/export.csv",
+  reportsController.exportDriversReport
+);
+
 module.exports = router;

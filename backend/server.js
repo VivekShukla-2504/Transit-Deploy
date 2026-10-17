@@ -2,6 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { loadBackendEnv } = require('./utils/env');
+
+// Initialize environment variables first
+const MONGO_URI = loadBackendEnv();
+
 const { startLicenseExpiryChecks } = require('./utils/cron');
 
 const authRoutes = require('./routes/auth');
@@ -18,6 +22,11 @@ const app = express();
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(express.json());
+
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'transitops-backend' }));
 
@@ -42,7 +51,6 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = loadBackendEnv();
 
 mongoose
   .connect(MONGO_URI)

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertTriangle, Download } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import StatusTag from '../components/StatusTag';
 import Modal from '../components/Modal';
+import ConfirmModal from '../components/ConfirmModal';
 import {
   Field,
   Input,
@@ -36,12 +38,17 @@ export default function Drivers() {
   const [drivers, setDrivers] = useState([]);
   const [meta, setMeta] = useState({ statuses: [] });
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
+  const [confirmDriver, setConfirmDriver] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -97,31 +104,75 @@ export default function Drivers() {
 
       if (editing) {
         await api.put(`/drivers/${editing._id}`, payload);
+        toast.success(`Driver ${payload.name} updated successfully.`);
       } else {
         await api.post('/drivers', payload);
+        toast.success(`Driver ${payload.name} registered successfully.`);
       }
 
       setModalOpen(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not save driver.');
+      const msg = err.response?.data?.message || 'Could not save driver.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (driver) => {
-    if (!confirm(`Delete driver ${driver.name}? This cannot be undone.`)) {
-      return;
-    }
+  const remove = (driver) => {
+    setConfirmDriver(driver);
+  };
 
+  const handleDeleteDriver = async () => {
+    if (!confirmDriver) return;
+    setDeleting(true);
     try {
-      await api.delete(`/drivers/${driver._id}`);
+      await api.delete(`/drivers/${confirmDriver._id}`);
+      toast.success(`Driver ${confirmDriver.name} deleted.`);
+      setConfirmDriver(null);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Could not delete driver.');
+      toast.error(err.response?.data?.message || 'Could not delete driver.');
+    } finally {
+      setDeleting(false);
     }
   };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const response = await api.get('/reports/drivers/export.csv', {
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'transitops-drivers.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Drivers registry exported to CSV.');
+    } catch (err) {
+      toast.error('Failed to export drivers.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const filteredDrivers = drivers.filter((driver) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      driver.name?.toLowerCase().includes(term) ||
+      driver.email?.toLowerCase().includes(term) ||
+      driver.licenseNumber?.toLowerCase().includes(term) ||
+      driver.contactNumber?.toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div>
@@ -134,6 +185,14 @@ export default function Drivers() {
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Input
+            type="text"
+            placeholder="Search name, license, contact..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-56"
+          />
+
           <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -146,6 +205,17 @@ export default function Drivers() {
               </option>
             ))}
           </Select>
+
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={exporting}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-base-700 bg-base-900 px-3 py-2 text-xs font-semibold text-base-200 hover:border-signal-500 hover:text-signal-500 transition disabled:opacity-50"
+            title="Export drivers to CSV"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
 
           {canManage && (
             <PrimaryButton
@@ -182,14 +252,14 @@ export default function Drivers() {
                   Loading…
                 </td>
               </tr>
-            ) : drivers.length === 0 ? (
+            ) : filteredDrivers.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-6 text-center text-base-400">
-                  No drivers registered yet.
+                  {searchTerm ? 'No drivers match your search.' : 'No drivers registered yet.'}
                 </td>
               </tr>
             ) : (
-              drivers.map((driver) => (
+              filteredDrivers.map((driver) => (
                 <tr
                   key={driver._id}
                   className="border-b border-base-800 last:border-0 hover:bg-base-800/50"
@@ -362,6 +432,16 @@ export default function Drivers() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(confirmDriver)}
+        title="Delete Driver"
+        message={`Are you sure you want to delete driver ${confirmDriver?.name}? This cannot be undone.`}
+        confirmText={deleting ? 'Deleting…' : 'Delete driver'}
+        danger
+        onConfirm={handleDeleteDriver}
+        onCancel={() => !deleting && setConfirmDriver(null)}
+      />
     </div>
   );
 }

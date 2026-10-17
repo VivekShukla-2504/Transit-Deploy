@@ -3,6 +3,8 @@ const {
   VEHICLE_STATUSES,
   VEHICLE_TYPES,
 } = require("../models/Vehicle");
+const { Trip } = require("../models/Trip");
+const { Maintenance } = require("../models/Maintenance");
 
 // GET /api/vehicles
 exports.getVehicles = async (req, res) => {
@@ -221,6 +223,23 @@ exports.deleteVehicle = async (req, res) => {
       return res.status(400).json({
         message:
           "Cannot delete a vehicle that is currently on a trip.",
+      });
+    }
+
+    const [hasActiveTrip, hasOpenMaintenance] = await Promise.all([
+      Trip.exists({ vehicle: vehicle._id, status: { $in: ['Draft', 'Dispatched'] } }),
+      Maintenance.exists({ vehicle: vehicle._id, status: 'Open' }),
+    ]);
+
+    if (hasActiveTrip) {
+      return res.status(400).json({
+        message: "Cannot delete a vehicle with active or draft trips. Cancel or complete them first.",
+      });
+    }
+
+    if (hasOpenMaintenance) {
+      return res.status(400).json({
+        message: "Cannot delete a vehicle with an open maintenance record. Close maintenance first.",
       });
     }
 

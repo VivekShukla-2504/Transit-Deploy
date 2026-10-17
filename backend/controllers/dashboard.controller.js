@@ -2,13 +2,6 @@ const { Vehicle } = require("../models/Vehicle");
 const { Driver } = require("../models/Driver");
 const { Trip } = require("../models/Trip");
 
-console.log("Dashboard Controller Loaded");
-console.log(exports);
-
-
-
-
-// get api for vehicle status 
 // GET /api/dashboard/vehicle-status
 exports.getVehicleStatus = async (req, res) => {
   try {
@@ -159,6 +152,3 @@ exports.getFilters = async (req, res) => {
     });
   }
 };
-
-console.log("Dashboard Controller Loaded");
-console.log(exports);
